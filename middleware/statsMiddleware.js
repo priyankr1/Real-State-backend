@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import Stats from '../models/statsModel.js';
 
 export const trackAPIStats = async (req, res, next) => {
@@ -7,6 +8,8 @@ export const trackAPIStats = async (req, res, next) => {
     try {
       // Skip tracking for OPTIONS and HEAD requests
       if (!['OPTIONS', 'HEAD'].includes(req.method)) {
+        if (mongoose.connection.readyState !== 1) return;
+
         const duration = Date.now() - start;
         await Stats.create({
           endpoint: req.originalUrl,
