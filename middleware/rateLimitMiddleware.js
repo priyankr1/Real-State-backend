@@ -121,3 +121,24 @@ export const apiLimiter = rateLimit({
     return req.ip || req.connection.remoteAddress;
   },
 });
+
+/**
+ * Enquiry form rate limiter
+ * Limits: 8 submissions per 10 minutes per IP.
+ *
+ * Deliberately loose. A shared office or mobile carrier NAT puts many real
+ * buyers behind one address, and a blocked enquiry is lost revenue — the
+ * honeypot and Salesforce-side dedupe are the real spam defences, this is
+ * only a ceiling on flooding.
+ */
+export const enquiryLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 8,
+  message: {
+    success: false,
+    message: 'Too many enquiries from this connection. Please try again shortly, or call us.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.ip || req.connection.remoteAddress,
+});

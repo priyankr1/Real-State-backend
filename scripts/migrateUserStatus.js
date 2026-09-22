@@ -12,7 +12,7 @@ dotenv.config();
  *
  * Usage: node backend/scripts/migrateUserStatus.js
  */
-async function migrateUserStatus() {
+async function migrateUserStatus() { 
   try {
     // Connect to MongoDB
     await mongoose.connect(process.env.MONGO_URI);

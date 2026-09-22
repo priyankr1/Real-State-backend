@@ -56,6 +56,35 @@ const propertySchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    /**
+     * Link to the project brochure (PDF).
+     *
+     * A URL rather than an upload: brochures are large, are revised often, and
+     * are usually already hosted on a CDN or a DAM. Storing a link means a new
+     * revision replaces the file at source without anyone touching this system.
+     *
+     * Empty hides the download button entirely — a dead brochure link on a
+     * property page is worse than no brochure at all.
+     */
+    brochureUrl: {
+      type: String,
+      default: "",
+    },
+    /**
+     * RERA registration number, e.g. WBRERA/P/NOR/2025/002844.
+     *
+     * Not decoration. Advertising a registered project in India without
+     * displaying its registration number is a compliance failure, and it is
+     * the first thing a careful buyer looks for. Stored per property because a
+     * campus registers tower by tower — one number for the whole development
+     * would be wrong on every tower but the first.
+     */
+    rera: {
+      type: String,
+      default: "",
+      trim: true,
+      maxlength: 200,
+    },
 
     // ── User listing fields ──────────────────────────────────────────────────
     // Listings added via the admin panel leave these at their defaults.

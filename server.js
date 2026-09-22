@@ -12,15 +12,22 @@ import { requestIdMiddleware } from './middleware/requestIdMiddleware.js';
 import logger from './utils/logger.js';
 import propertyrouter from './routes/productRoutes.js';
 import userrouter from './routes/userRoutes.js';
-import formrouter from './routes/formRoutes.js';
+import enquiryRouter from './routes/enquiryRoutes.js';
 import newsrouter from './routes/newsRoutes.js';
 import appointmentRouter from './routes/appointmentRoutes.js';
 import adminRouter from './routes/adminRoutes.js';
 import propertyRoutes from './routes/propertyRoutes.js';
 import healthRouter from './routes/healthRoutes.js';
+import blogRouter from './routes/blogRoutes.js';
+import mediaRouter from './routes/mediaRoutes.js';
+import galleryRouter from './routes/galleryRoutes.js';
+import associationRouter from './routes/associationRoutes.js';
+import legalRouter from './routes/legalRoutes.js';
+import siteContentRouter from './routes/siteContentRoutes.js';
 import getStatusPage from './serverweb.js';
 import { startExpireListingsJob } from './utils/expireListings.js';
 import { startAutoUnsuspendJob } from './utils/autoUnsuspend.js';
+import { startSalesforceRetryJob } from './utils/salesforceRetry.js';
 import { printBanner } from './utils/banner.js';
 
 if (process.env.NODE_ENV !== 'production') {
@@ -112,8 +119,8 @@ const envOrigins = [
 
 const defaultDevOrigins = [
   'http://localhost:4000',
-  'http://localhost:5173',
-  'http://localhost:5174',
+  'http://localhost:3000', // Next.js frontend (dev)
+  'http://localhost:5174', // admin panel (Vite)
 ];
 
 const allowedOrigins = [
@@ -151,6 +158,7 @@ connectdb().then(() => {
   if (process.env.NODE_ENV === 'production') logger.info('Database connected successfully');
   startExpireListingsJob();
   startAutoUnsuspendJob();
+  startSalesforceRetryJob();
   printBanner({
     port: process.env.PORT || 4000,
     env: process.env.NODE_ENV || 'development',
@@ -174,6 +182,7 @@ connectdb().then(() => {
         logger.info('Database reconnected successfully');
         startExpireListingsJob();
         startAutoUnsuspendJob();
+        startSalesforceRetryJob();
       }).catch((retryErr) => {
         logger.error('Database retry failed', { error: retryErr.message });
       });
@@ -188,10 +197,20 @@ app.use('/health', healthRouter);
 // API Routes
 app.use('/api/products', propertyrouter);
 app.use('/api/users', userrouter);
-app.use('/api/forms', formrouter);
+// Enquiries. Mounted at /api/forms as well because that is where the site's
+// existing contact and callback forms post — a visitor holding a cached
+// bundle mid-deploy must not hit a 404 with a completed form.
+app.use('/api/enquiries', enquiryRouter);
+app.use('/api/forms', enquiryRouter);
 app.use('/api/news', newsrouter);
 app.use('/api/appointments', appointmentRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/blogs', blogRouter);
+app.use('/api/media', mediaRouter);
+app.use('/api/gallery', galleryRouter);
+app.use('/api/associations', associationRouter);
+app.use('/api/legal', legalRouter);
+app.use('/api/site-content', siteContentRouter);
 app.use('/api', propertyRoutes);
 
 
