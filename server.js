@@ -28,6 +28,7 @@ import getStatusPage from './serverweb.js';
 import { startExpireListingsJob } from './utils/expireListings.js';
 import { startAutoUnsuspendJob } from './utils/autoUnsuspend.js';
 import { startSalesforceRetryJob } from './utils/salesforceRetry.js';
+import { salesforceConfigWarnings } from './services/salesforceService.js';
 import { printBanner } from './utils/banner.js';
 
 if (process.env.NODE_ENV !== 'production') {
@@ -152,6 +153,14 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
+
+// Salesforce configuration is checked once at boot rather than per enquiry:
+// a missing default campaign code rejects every lead the endpoint receives,
+// and that is worth finding in the deploy log instead of in a week of failed
+// syncs. Warnings only — a misconfigured CRM must never stop the site serving.
+for (const warning of salesforceConfigWarnings()) {
+  logger.warn('Salesforce configuration', { warning });
+}
 
 // Database connection
 connectdb().then(() => {

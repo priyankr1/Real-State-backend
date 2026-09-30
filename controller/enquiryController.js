@@ -52,6 +52,19 @@ const normaliseTouch = (raw = {}) => ({
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
+/**
+ * A date the visitor picked, or null.
+ *
+ * Null rather than "now" on an unparseable value: a preferred call time is a
+ * promise to the visitor, and inventing one nobody chose puts a sales call at
+ * an hour they never agreed to.
+ */
+const cleanDate = (value) => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
 // ── Public ──────────────────────────────────────────────────────────────────
 
 /**
@@ -118,6 +131,20 @@ export const submitEnquiry = async (req, res) => {
       phone,
       message,
       interest: clean(body.interest, 200),
+
+      // Salesforce enquiry detail. Every one is optional — the standard forms
+      // send none of them, and a campaign landing page or a site-visit booking
+      // form can send whichever it collects.
+      country: clean(body.country, 60),
+      countryCode: clean(body.countryCode, 8),
+      campaignCode: clean(body.campaignCode, 60),
+      customerOrigin: clean(body.customerOrigin, 60),
+      configuration: clean(body.configuration, 120),
+      budget: clean(body.budget, 120),
+      preferredCallAt: cleanDate(body.preferredCallAt),
+      preferredVisitAt: cleanDate(body.preferredVisitAt),
+      preferredVisitType: clean(body.preferredVisitType, 40),
+
       formType: clean(body.formType, 40) || 'contact',
       pagePath: clean(body.pagePath, 500),
       pageTitle: clean(body.pageTitle, 300),
@@ -215,11 +242,23 @@ async function syncToSalesforce(enquiryId) {
       enquiry.salesforce.leadId = result.leadId || '';
       enquiry.salesforce.syncedAt = new Date();
       enquiry.salesforce.mode = result.mode || '';
+      enquiry.salesforce.message = result.message || '';
+      enquiry.salesforce.retryable = true;
       enquiry.salesforce.lastError = '';
+
+      // Recorded so a later retry, or an audit months from now, can see which
+      // campaign this lead was filed under without re-deriving it.
+      if (result.campaignCode) {
+        enquiry.salesforce.campaignCode = result.campaignCode;
+        if (!enquiry.campaignCode) enquiry.campaignCode = result.campaignCode;
+      }
     } else {
       enquiry.salesforce.status = 'failed';
       enquiry.salesforce.lastError = String(result.error || 'unknown').slice(0, 500);
       enquiry.salesforce.mode = result.mode || '';
+      // A rejection that cannot change on its own stops the retry sweep here
+      // rather than being replayed until the attempt ceiling is hit.
+      enquiry.salesforce.retryable = !result.permanent;
     }
 
     enquiry.salesforce.attempts = (enquiry.salesforce.attempts || 0) + 1;
@@ -357,7 +396,8 @@ export const adminExportEnquiries = async (req, res) => {
     const columns = [
       'Date', 'Name', 'Email', 'Phone', 'Form', 'Page', 'Interest', 'Message',
       'Source', 'Medium', 'Campaign', 'Term', 'Content', 'GCLID',
-      'Landing page', 'Referrer', 'Number shown', 'Status', 'Salesforce', 'Lead ID',
+      'Landing page', 'Referrer', 'Number shown', 'Status',
+      'Campaign code', 'Salesforce', 'Salesforce ID', 'Sync error',
     ];
 
     // A leading =, +, - or @ makes Excel treat a cell as a formula, which is a
@@ -378,7 +418,9 @@ export const adminExportEnquiries = async (req, res) => {
           r.firstTouch?.source, r.firstTouch?.medium, r.firstTouch?.campaign,
           r.firstTouch?.term, r.firstTouch?.content, r.firstTouch?.gclid,
           r.firstTouch?.landingPage, r.firstTouch?.referrer,
-          r.displayedPhone, r.status, r.salesforce?.status, r.salesforce?.leadId,
+          r.displayedPhone, r.status,
+          r.salesforce?.campaignCode || r.campaignCode,
+          r.salesforce?.status, r.salesforce?.leadId, r.salesforce?.lastError,
         ]
           .map(cell)
           .join(',')
@@ -407,7 +449,14 @@ export const adminGetEnquiry = async (req, res) => {
   }
 };
 
-/** PUT /api/enquiries/admin/:id — status and internal notes only. */
+/**
+ * PUT /api/enquiries/admin/:id
+ *
+ * Status and internal notes, plus the two fields whose absence makes
+ * Salesforce reject an enquiry outright — a mistyped mobile number or a
+ * missing campaign code is otherwise a dead lead nobody can rescue. Nothing
+ * else the visitor typed is editable: this is a record of what they said.
+ */
 export const adminUpdateEnquiry = async (req, res) => {
   try {
     const enquiry = await Enquiry.findById(req.params.id);
@@ -415,6 +464,10 @@ export const adminUpdateEnquiry = async (req, res) => {
 
     if (req.body.status) enquiry.status = req.body.status;
     if (typeof req.body.notes === 'string') enquiry.notes = clean(req.body.notes, 4000);
+    if (typeof req.body.phone === 'string') enquiry.phone = clean(req.body.phone, 32);
+    if (typeof req.body.campaignCode === 'string') {
+      enquiry.campaignCode = clean(req.body.campaignCode, 60);
+    }
     await enquiry.save();
 
     return res.json({ success: true, enquiry });
@@ -429,8 +482,11 @@ export const adminResyncEnquiry = async (req, res) => {
     const enquiry = await Enquiry.findById(req.params.id);
     if (!enquiry) return res.status(404).json({ success: false, message: 'Enquiry not found' });
 
-    // Reset so a previously synced lead can be pushed again on purpose.
+    // Reset so a previously synced lead can be pushed again on purpose, and
+    // so an enquiry parked as unretryable gets one more go — an admin only
+    // presses resync after fixing whatever Salesforce objected to.
     enquiry.salesforce.status = 'pending';
+    enquiry.salesforce.retryable = true;
     await enquiry.save();
     await syncToSalesforce(enquiry._id);
 

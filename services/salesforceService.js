@@ -1,33 +1,45 @@
 import logger from '../utils/logger.js';
+import { getAccessToken, resetTokenCache } from './salesforceAuth.js';
+import { createEnquiry, validateCampaignCodeMap } from './salesforceEnquiryApi.js';
 
 /**
  * Salesforce lead delivery.
  *
- * Two transports, chosen by what is configured:
+ * Three transports, chosen by what is configured:
  *
- *   rest         — OAuth 2.0 against a connected app, then POST sObjects/Lead.
- *                  Returns a real Lead Id and real errors, so a failed lead is
- *                  knowable and retryable. Preferred.
+ *   enquiry-api  — Merlin's own Apex service, POST to
+ *                  /services/apexrest/Merlin/InsertNewEnquiry/. This is the
+ *                  integration Merlin's SFDC team documented and the one their
+ *                  org is actually wired for: it creates an Enquiry, not a
+ *                  Lead, and derives project, source and sub-source from the
+ *                  campaign code. Default whenever credentials exist.
+ *   rest         — the stock Lead object, POST sObjects/Lead. Kept for orgs
+ *                  without the Apex service; select it with SALESFORCE_MODE.
  *   web-to-lead  — form POST to webto.salesforce.com. Needs no credentials,
  *                  which is why clients like it, but it answers 200 to
- *                  everything including rejected leads. Use only if Merlin
- *                  cannot provide a connected app.
+ *                  everything including rejected leads, so a lead lost to a
+ *                  validation rule cannot be detected here.
  *
- * With neither configured every call returns { skipped: true } and the enquiry
+ * With none configured every call returns { skipped: true } and the enquiry
  * still saves. Lead capture must never depend on a third party being up — the
  * enquiry is in MongoDB before this module is ever called.
  */
 
 const API_VERSION = process.env.SALESFORCE_API_VERSION || 'v60.0';
 
-/** Cached OAuth token. Salesforce tokens are long-lived; re-auth per lead is waste. */
-let tokenCache = { accessToken: null, instanceUrl: null, expiresAt: 0 };
+const MODES = new Set(['enquiry-api', 'rest', 'web-to-lead', 'off']);
 
 export function salesforceMode() {
   const explicit = (process.env.SALESFORCE_MODE || '').trim().toLowerCase();
-  if (explicit === 'rest' || explicit === 'web-to-lead' || explicit === 'off') return explicit;
+  if (MODES.has(explicit)) return explicit;
 
-  if (process.env.SALESFORCE_CLIENT_ID && process.env.SALESFORCE_CLIENT_SECRET) return 'rest';
+  // Credentials imply the Apex service rather than the Lead object: that is
+  // what Merlin's integration document specifies, and picking `rest` here
+  // would quietly write into a different object than the one their sales team
+  // works from.
+  if (process.env.SALESFORCE_CLIENT_ID && process.env.SALESFORCE_CLIENT_SECRET) {
+    return 'enquiry-api';
+  }
   if (process.env.SALESFORCE_ORG_ID) return 'web-to-lead';
   return 'off';
 }
@@ -36,69 +48,40 @@ export function isSalesforceConfigured() {
   return salesforceMode() !== 'off';
 }
 
-// ── OAuth ───────────────────────────────────────────────────────────────────
+/**
+ * Configuration problems worth saying out loud at boot rather than discovering
+ * one failed enquiry at a time.
+ */
+export function salesforceConfigWarnings() {
+  const mode = salesforceMode();
+  if (mode === 'off') return [];
 
-async function getAccessToken() {
-  if (tokenCache.accessToken && Date.now() < tokenCache.expiresAt) {
-    return tokenCache;
+  const warnings = [];
+  const mapError = validateCampaignCodeMap();
+  if (mapError) warnings.push(mapError);
+
+  if (mode === 'enquiry-api' || mode === 'rest') {
+    if (!process.env.SALESFORCE_CLIENT_ID || !process.env.SALESFORCE_CLIENT_SECRET) {
+      warnings.push(`SALESFORCE_MODE=${mode} needs SALESFORCE_CLIENT_ID and SALESFORCE_CLIENT_SECRET`);
+    }
   }
 
-  const loginUrl = (process.env.SALESFORCE_LOGIN_URL || 'https://login.salesforce.com').replace(
-    /\/+$/,
-    ''
-  );
-
-  const body = new URLSearchParams();
-  body.set('client_id', process.env.SALESFORCE_CLIENT_ID || '');
-  body.set('client_secret', process.env.SALESFORCE_CLIENT_SECRET || '');
-
-  // Client credentials is the right flow for server-to-server lead creation:
-  // no user, no refresh token to leak. The username/password flow is only a
-  // fallback for orgs that have not enabled a client-credentials run-as user.
-  if (process.env.SALESFORCE_USERNAME && process.env.SALESFORCE_PASSWORD) {
-    body.set('grant_type', 'password');
-    body.set('username', process.env.SALESFORCE_USERNAME);
-    body.set(
-      'password',
-      `${process.env.SALESFORCE_PASSWORD}${process.env.SALESFORCE_SECURITY_TOKEN || ''}`
+  if (mode === 'enquiry-api' && !process.env.SALESFORCE_DEFAULT_CAMPAIGN_CODE) {
+    // Campaign_Code is mandatory on the endpoint. Without a default, every
+    // enquiry that arrives without a mapped UTM is rejected outright.
+    warnings.push(
+      'SALESFORCE_DEFAULT_CAMPAIGN_CODE is unset — enquiries with no mapped campaign will be rejected'
     );
-  } else {
-    body.set('grant_type', 'client_credentials');
   }
 
-  const response = await fetch(`${loginUrl}/services/oauth2/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  });
-
-  const text = await response.text();
-  if (!response.ok) {
-    // Never log the body verbatim at error level — it can echo credentials.
-    throw new Error(`Salesforce auth failed (${response.status}): ${text.slice(0, 300)}`);
+  if (mode === 'web-to-lead' && !process.env.SALESFORCE_ORG_ID) {
+    warnings.push('SALESFORCE_MODE=web-to-lead needs SALESFORCE_ORG_ID');
   }
 
-  const data = JSON.parse(text);
-  tokenCache = {
-    accessToken: data.access_token,
-    instanceUrl: (data.instance_url || process.env.SALESFORCE_INSTANCE_URL || '').replace(
-      /\/+$/,
-      ''
-    ),
-    // Salesforce does not return expires_in for these flows. 90 minutes is
-    // comfortably inside the default 2-hour session timeout, and a 401 below
-    // clears the cache anyway.
-    expiresAt: Date.now() + 90 * 60 * 1000,
-  };
-
-  if (!tokenCache.instanceUrl) {
-    throw new Error('Salesforce auth returned no instance_url and SALESFORCE_INSTANCE_URL is unset');
-  }
-
-  return tokenCache;
+  return warnings;
 }
 
-// ── Field mapping ───────────────────────────────────────────────────────────
+// ── Field mapping (Lead object transports only) ─────────────────────────────
 
 /**
  * Salesforce Lead requires LastName and Company. Indian enquiry forms collect
@@ -241,7 +224,7 @@ async function createLeadViaRest(enquiry) {
   // A cached token can outlive the session (admin revoke, password reset).
   // One forced re-auth turns a permanent failure into a transient one.
   if (response.status === 401) {
-    tokenCache = { accessToken: null, instanceUrl: null, expiresAt: 0 };
+    resetTokenCache();
     const fresh = await getAccessToken();
     response = await send(fresh.accessToken);
   }
@@ -297,9 +280,19 @@ async function createLeadViaWebToLead(enquiry) {
 
 // ── Public API ──────────────────────────────────────────────────────────────
 
+const TRANSPORTS = {
+  'enquiry-api': createEnquiry,
+  rest: createLeadViaRest,
+  'web-to-lead': createLeadViaWebToLead,
+};
+
 /**
  * Pushes one enquiry to Salesforce.
+ *
  * Never throws — returns a result object the caller records on the enquiry.
+ * `permanent` on a failure means the same payload will be rejected the same
+ * way forever (a missing mandatory field, a 404 on the Apex path); the retry
+ * sweep uses it to stop replaying work that cannot succeed.
  */
 export async function sendLead(enquiry) {
   const mode = salesforceMode();
@@ -307,23 +300,41 @@ export async function sendLead(enquiry) {
     return { ok: false, skipped: true, reason: 'Salesforce not configured' };
   }
 
-  try {
-    const result =
-      mode === 'web-to-lead' ? await createLeadViaWebToLead(enquiry) : await createLeadViaRest(enquiry);
+  const transport = TRANSPORTS[mode];
+  if (!transport) {
+    return { ok: false, skipped: true, reason: `Unknown SALESFORCE_MODE "${mode}"` };
+  }
 
-    logger.info('Salesforce lead created', {
+  try {
+    const result = await transport(enquiry);
+
+    logger.info('Salesforce enquiry delivered', {
       enquiryId: String(enquiry._id || ''),
-      leadId: result.leadId || '(web-to-lead)',
+      leadId: result.leadId || '(no id returned)',
+      campaignCode: result.campaignCode || '',
       mode: result.mode,
     });
     return { ok: true, ...result };
   } catch (error) {
-    logger.error('Salesforce lead failed', {
+    logger.error('Salesforce delivery failed', {
       enquiryId: String(enquiry._id || ''),
+      mode,
+      permanent: Boolean(error.permanent),
       error: error.message,
     });
-    return { ok: false, skipped: false, error: error.message, mode };
+    return {
+      ok: false,
+      skipped: false,
+      error: error.message,
+      permanent: Boolean(error.permanent),
+      mode,
+    };
   }
 }
 
-export default { sendLead, isSalesforceConfigured, salesforceMode };
+export default {
+  sendLead,
+  isSalesforceConfigured,
+  salesforceMode,
+  salesforceConfigWarnings,
+};

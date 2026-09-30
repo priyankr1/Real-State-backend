@@ -11,6 +11,7 @@
     "build": "echo 'Build completed'",
     "render-build": "npm install",
     "check:email": "node scripts/checkEmail.js",
+    "check:salesforce": "node scripts/checkSalesforce.js",
     "seed:site": "node scripts/seedSiteContent.js",
     "seed:collections": "node scripts/seedMerlinCollections.js",
     "seed:projects": "node scripts/seedMerlinProjects.js",

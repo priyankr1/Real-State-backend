@@ -47,6 +47,40 @@ const enquirySchema = new mongoose.Schema(
     /** Free-text interest ("City residences", a project name, …). */
     interest: { type: String, default: '', trim: true, maxlength: 200 },
 
+    // ── Salesforce enquiry detail ──────────────────────────────────────────
+    // Fields the Merlin InsertNewEnquiry endpoint carries. All optional: no
+    // form collects every one, and the endpoint only insists on name, mobile
+    // and campaign code. They exist so a campaign landing page or a site-visit
+    // booking form can supply them without a second integration being written.
+
+    /** Dial code, e.g. "+91". Derived from the phone number when not sent. */
+    countryCode: { type: String, default: '', trim: true, maxlength: 8 },
+    country: { type: String, default: '', trim: true, maxlength: 60 },
+
+    /**
+     * The campaign this enquiry belongs to, as Salesforce knows it.
+     *
+     * Mandatory on the endpoint, and the field Salesforce uses to derive the
+     * project, source and sub-source — so it is stored on the enquiry rather
+     * than recomputed at send time. A retry weeks later then reproduces the
+     * code the visitor actually arrived under, not the code today's mapping
+     * would infer.
+     */
+    campaignCode: { type: String, default: '', trim: true, maxlength: 60 },
+
+    /** "Same State" / "Other State" / "NRI" — free text, echoed as sent. */
+    customerOrigin: { type: String, default: '', trim: true, maxlength: 60 },
+    /** Unit configuration, e.g. "2 BHK". */
+    configuration: { type: String, default: '', trim: true, maxlength: 120 },
+    /** Budget bucket, e.g. "2_bhk_-_78_lakhs_onw". */
+    budget: { type: String, default: '', trim: true, maxlength: 120 },
+
+    /** When the visitor asked to be called. */
+    preferredCallAt: { type: Date, default: null },
+    /** When the visitor asked to visit, and how. */
+    preferredVisitAt: { type: Date, default: null },
+    preferredVisitType: { type: String, default: '', trim: true, maxlength: 40 },
+
     // ── Where it came from on the site ──────────────────────────────────────
     formType: {
       type: String,
@@ -94,12 +128,30 @@ const enquirySchema = new mongoose.Schema(
         default: 'pending',
         index: true,
       },
+      /** The record id Salesforce returned. Empty for web-to-lead, which returns none. */
       leadId: { type: String, default: '' },
       syncedAt: { type: Date, default: null },
       attempts: { type: Number, default: 0 },
       lastError: { type: String, default: '' },
-      /** 'rest' | 'web-to-lead' — which transport actually delivered it. */
+      /** 'enquiry-api' | 'rest' | 'web-to-lead' — which transport handled it. */
       mode: { type: String, default: '' },
+
+      /**
+       * False once Salesforce has rejected this enquiry for a reason that
+       * cannot change on its own — a missing mandatory field, an unknown
+       * campaign code, a 404 on the Apex path. The retry sweep skips these:
+       * replaying a rejection every ten minutes for six hours consumes the
+       * org's API limits and buries the failures that are worth retrying.
+       * It still shows as failed in the admin panel, where a human can fix
+       * the data and resync.
+       */
+      retryable: { type: Boolean, default: true },
+
+      /** The message the endpoint returned, verbatim — its wording is the diagnosis. */
+      message: { type: String, default: '' },
+
+      /** The campaign code actually sent, which may have been inferred from UTMs. */
+      campaignCode: { type: String, default: '' },
     },
 
     // ── Request metadata ───────────────────────────────────────────────────

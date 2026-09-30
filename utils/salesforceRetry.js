@@ -24,6 +24,10 @@ export function startSalesforceRetryJob() {
       const stuck = await Enquiry.find({
         'salesforce.status': { $in: ['pending', 'failed'] },
         'salesforce.attempts': { $lt: MAX_ATTEMPTS },
+        // Rejections that cannot change on their own — a missing mobile
+        // number, an unknown campaign code — are excluded. $ne rather than
+        // true so enquiries written before this flag existed still sweep.
+        'salesforce.retryable': { $ne: false },
       })
         .sort({ createdAt: 1 })
         .limit(25)
