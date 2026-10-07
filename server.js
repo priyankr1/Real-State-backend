@@ -107,7 +107,7 @@ app.use(mongoSanitize({
 const parseCsv = (value = '') =>
   value
     .split(',')
-    .map((v) => v.trim())
+    .map((v) => v.trim().replace(/\/+$/, ''))
     .filter(Boolean);
 
 const envOrigins = [
@@ -116,7 +116,7 @@ const envOrigins = [
   process.env.WEBSITE_URL,
   ...parseCsv(process.env.LOCAL_URLS || ''),
   ...parseCsv(process.env.EXTRA_ALLOWED_ORIGINS || ''),
-].filter(Boolean);
+].filter(Boolean).map((origin) => origin.replace(/\/+$/, ''));
 
 const defaultDevOrigins = [
   'http://localhost:4000',
