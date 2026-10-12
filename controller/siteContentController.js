@@ -20,12 +20,13 @@ import { clean, parseList, parseObject, uploadImageFile } from './contentControl
  * below constructs a fresh object from an allowlist and drops the rest.
  */
 
-const KEYS = ['home', 'about', 'settings'];
+const KEYS = ['home', 'about', 'settings', 'pages'];
 
 const LABELS = {
   home: 'Home page',
   about: 'About Us page',
   settings: 'Site-wide settings',
+  pages: 'Other pages',
 };
 
 /** Which ISR paths a change to each key invalidates. */
@@ -34,7 +35,8 @@ const PATHS = {
   about: ['/about', '/archive'],
   // Settings drive the nav, footer and schema graph, which are on every page.
   // Next has no "purge everything" call, so the routes that matter are listed.
-  settings: ['/', '/about', '/properties', '/blog', '/media', '/gallery', '/corporate-association', '/contact', '/archive'],
+  settings: ['/', '/about', '/properties', '/blog', '/media', '/gallery', '/corporate-association', '/contact', '/archive', '/about-wtc'],
+  pages: ['/', '/about-wtc', '/properties', '/blog', '/media', '/gallery', '/corporate-association', '/contact', '/archive'],
 };
 
 // ── Field helpers ───────────────────────────────────────────────────────────
@@ -182,6 +184,7 @@ const normalizeHome = (body) => {
     showcase: {
       kicker: text(showcase.kicker, 120),
       heading: text(showcase.heading, 200),
+      intro: longText(showcase.intro, 800),
       items: list(showcase.items, (item) => {
         const entry = parseObject(item);
         const image = imagePath(entry.image);
@@ -252,6 +255,59 @@ const normalizeHome = (body) => {
       heading: text(enquiry.heading, 200),
       intro: longText(enquiry.intro, 800),
       promise: text(enquiry.promise, 200),
+    },
+
+    statement: {
+      kicker: text(parseObject(body.statement).kicker, 120),
+      heading: text(parseObject(body.statement).heading, 300),
+      body: longText(parseObject(body.statement).body, 800),
+      image: imagePath(parseObject(body.statement).image),
+      imageAlt: text(parseObject(body.statement).imageAlt, 250),
+    },
+
+    campus: {
+      kicker: text(parseObject(body.campus).kicker, 120),
+      heading: text(parseObject(body.campus).heading, 300),
+      items: list(parseObject(body.campus).items, (item) => {
+        const entry = parseObject(item);
+        const title = text(entry.title, 160);
+        if (!title) return null;
+        return {
+          title,
+          description: longText(entry.description, 800),
+          image: imagePath(entry.image),
+          imageAlt: text(entry.imageAlt, 250),
+        };
+      }, 8),
+    },
+
+    spaces: {
+      kicker: text(parseObject(body.spaces).kicker, 120),
+      heading: text(parseObject(body.spaces).heading, 300),
+      intro: longText(parseObject(body.spaces).intro, 800),
+      items: list(parseObject(body.spaces).items, (item) => {
+        const entry = parseObject(item);
+        const name = text(entry.name, 160);
+        if (!name) return null;
+        return {
+          name,
+          area: text(entry.area, 80),
+          body: longText(entry.body, 600),
+        };
+      }, 12),
+    },
+
+    location: {
+      kicker: text(parseObject(body.location).kicker, 120),
+      heading: text(parseObject(body.location).heading, 300),
+      intro: longText(parseObject(body.location).intro, 800),
+      mapQuery: text(parseObject(body.location).mapQuery, 200),
+      places: list(parseObject(body.location).places, (item) => {
+        const place = parseObject(item);
+        const name = text(place.name, 160);
+        if (!name) return null;
+        return { name, detail: text(place.detail, 200) };
+      }, 12),
     },
   };
 };
@@ -494,7 +550,143 @@ const normalizeSettings = (body) => {
   };
 };
 
-const NORMALIZERS = { home: normalizeHome, about: normalizeAbout, settings: normalizeSettings };
+/** Nested `seo` is what the editor saves. Flat fields remain readable from older drafts. */
+const seoFrom = (source) => {
+  const nested = parseObject(source?.seo);
+  const hasNested = nested.metaTitle || nested.metaDescription || (Array.isArray(nested.keywords) && nested.keywords.length);
+  return seoBlock(hasNested ? nested : source);
+};
+
+const masthead = (value) => {
+  const source = parseObject(value);
+  return {
+    seo: seoFrom(source),
+    index: text(source.index, 4),
+    eyebrow: text(source.eyebrow, 80),
+    title: text(source.title, 240),
+    intro: longText(source.intro, 800),
+    meta: text(source.meta, 240),
+  };
+};
+
+const normalizePages = (body) => {
+  const properties = parseObject(body.properties);
+  const aboutWtc = parseObject(body.aboutWtc);
+  const contact = parseObject(body.contact);
+  const media = parseObject(body.media);
+  const profile = parseObject(aboutWtc.profile);
+
+  return {
+    contact: {
+      ...masthead(contact),
+      faqHeading: text(contact.faqHeading, 160),
+      faqIntro: longText(contact.faqIntro, 400),
+      faq: list(contact.faq, (item) => {
+        const entry = parseObject(item);
+        const question = text(entry.question, 240);
+        if (!question) return null;
+        return { question, answer: longText(entry.answer, 1200) };
+      }, 20),
+    },
+    properties: {
+      ...masthead(properties),
+      configurationsHeading: text(properties.configurationsHeading, 200),
+      configurationsIntro: longText(properties.configurationsIntro, 800),
+      enquireLabel: text(properties.enquireLabel, 80),
+      items: list(properties.items, (item) => {
+        const entry = parseObject(item);
+        const name = text(entry.name, 160);
+        if (!name) return null;
+        return { name, area: text(entry.area, 80), body: longText(entry.body, 600) };
+      }, 12),
+      featuresHeading: text(properties.featuresHeading, 200),
+      features: list(properties.features, (item) => {
+        const entry = parseObject(item);
+        const title = text(entry.title, 160);
+        if (!title) return null;
+        return { title, detail: longText(entry.detail, 400) };
+      }, 16),
+      featureImage: imagePath(properties.featureImage),
+      featureImageAlt: text(properties.featureImageAlt, 250),
+      locationHeading: text(properties.locationHeading, 200),
+      locationIntro: longText(properties.locationIntro, 800),
+      places: list(properties.places, (item) => {
+        const place = parseObject(item);
+        const name = text(place.name, 160);
+        if (!name) return null;
+        return { name, detail: text(place.detail, 200) };
+      }, 12),
+      enquiryHeading: text(properties.enquiryHeading, 200),
+      enquiryBody: longText(properties.enquiryBody, 800),
+      enquiryCta: cta(properties.enquiryCta),
+      secondaryCta: cta(properties.secondaryCta),
+      footnote: text(properties.footnote, 240),
+    },
+    gallery: masthead(body.gallery),
+    blog: masthead(body.blog),
+    media: {
+      ...masthead(media),
+      sections: list(media.sections, (item) => {
+        const entry = parseObject(item);
+        const kind = text(entry.kind, 20);
+        if (!['award', 'event', 'media'].includes(kind)) return null;
+        return {
+          kind,
+          title: text(entry.title, 160),
+          blurb: longText(entry.blurb, 400),
+        };
+      }, 6),
+    },
+    corporate: masthead(body.corporate),
+    archive: masthead(body.archive),
+    aboutWtc: {
+      seo: seoFrom(aboutWtc),
+      hero: {
+        kicker: text(parseObject(aboutWtc.hero).kicker, 120),
+        headline: text(parseObject(aboutWtc.hero).headline, 200),
+        intro: longText(parseObject(aboutWtc.hero).intro, 800),
+        image: imagePath(parseObject(aboutWtc.hero).image),
+        imageAlt: text(parseObject(aboutWtc.hero).imageAlt, 250),
+      },
+      profile: {
+        heading: text(profile.heading, 200),
+        body: sanitizeRichText(String(profile.body ?? '')),
+        image: imagePath(profile.image),
+        imageAlt: text(profile.imageAlt, 250),
+      },
+      vision: {
+        heading: text(parseObject(aboutWtc.vision).heading, 200),
+        body: longText(parseObject(aboutWtc.vision).body, 1500),
+      },
+      mission: {
+        heading: text(parseObject(aboutWtc.mission).heading, 200),
+        body: longText(parseObject(aboutWtc.mission).body, 1500),
+      },
+      values: {
+        heading: text(parseObject(aboutWtc.values).heading, 200),
+        items: list(parseObject(aboutWtc.values).items, (item) => {
+          const entry = parseObject(item);
+          const title = text(entry.title, 160);
+          if (!title) return null;
+          return {
+            title,
+            description: longText(entry.description, 600),
+            image: imagePath(entry.image),
+            imageAlt: text(entry.imageAlt, 250),
+          };
+        }, 8),
+      },
+      cta: {
+        heading: text(parseObject(aboutWtc.cta).heading, 200),
+        body: longText(parseObject(aboutWtc.cta).body, 800),
+        ctaLabel: text(parseObject(aboutWtc.cta).ctaLabel, 80),
+        ctaHref: link(parseObject(aboutWtc.cta).ctaHref),
+      },
+    },
+  };
+};
+
+const NORMALIZERS = { home: normalizeHome, about: normalizeAbout, settings: normalizeSettings, pages: normalizePages };
 
 /** Exported so the seed script validates through exactly the same code path the API does. */
 export const normalizeSiteContent = (key, data) => {
