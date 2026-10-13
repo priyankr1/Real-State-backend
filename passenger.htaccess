@@ -1,0 +1,6 @@
+PassengerEnabled on
+PassengerAppRoot /home/wtcsaltlake/backend
+PassengerAppType node
+PassengerStartupFile app.js
+PassengerNodejs /opt/cpanel/ea-nodejs22/bin/node
+PassengerAppEnv production

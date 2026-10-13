@@ -316,13 +316,22 @@ app.use('*', (req, res) => {
 
 const port = process.env.PORT || 4000;
 
-// Start server
+// cPanel serves this app through Passenger. Passenger must own the socket;
+// a normal port bind is only for local and non-Passenger hosts.
 if (process.env.NODE_ENV !== 'test') {
-  server = app.listen(port, '0.0.0.0', () => {
-    if (process.env.NODE_ENV === 'production') {
-      logger.info('Server running', { port, host: '0.0.0.0' });
-    }
-  });
+  const passenger = globalThis.PhusionPassenger;
+  if (passenger) {
+    passenger.configure({ autoInstall: false });
+    server = app.listen('passenger', () => {
+      logger.info('Server running under Passenger');
+    });
+  } else {
+    server = app.listen(port, '0.0.0.0', () => {
+      if (process.env.NODE_ENV === 'production') {
+        logger.info('Server running', { port, host: '0.0.0.0' });
+      }
+    });
+  }
 }
 
 export default app;
