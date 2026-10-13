@@ -1,0 +1,11 @@
+---
+# cPanel runs this after a GitHub push is pulled.
+# The clone stays in the repository directory. The running app stays in DEPLOYPATH.
+# .env is not in git, so this copy leaves the server copy of .env in place.
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/wtcsaltlake/backend
+    - /bin/mkdir -p $DEPLOYPATH/tmp
+    - /bin/cp -R * $DEPLOYPATH
+    - cd $DEPLOYPATH && npm install --omit=dev
+    - /bin/touch $DEPLOYPATH/tmp/restart.txt
