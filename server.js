@@ -1,5 +1,5 @@
+import './config/loadEnv.js';
 import express from 'express';
-import dotenv from 'dotenv';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
@@ -30,11 +30,6 @@ import { startAutoUnsuspendJob } from './utils/autoUnsuspend.js';
 import { startSalesforceRetryJob } from './utils/salesforceRetry.js';
 import { salesforceConfigWarnings } from './services/salesforceService.js';
 import { printBanner } from './utils/banner.js';
-
-if (process.env.NODE_ENV !== 'production') {
-  dotenv.config({ path: './.env.local' });
-}
-dotenv.config(); // .env fallback / Render uses process-level env vars
 
 const app = express();
 

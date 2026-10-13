@@ -1,8 +1,5 @@
 import mysql from 'mysql2/promise';
-import dotenv from 'dotenv';
-
-if (process.env.NODE_ENV !== 'production') dotenv.config({ path: './.env.local' });
-dotenv.config();
+import './loadEnv.js';
 
 let pool;
 
