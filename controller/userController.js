@@ -341,7 +341,7 @@ const adminlogin = async (req, res) => {
     return res.json({ token, success: true });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: "Server error", success: false });
+    return res.status(500).json({ message: error.message || "Server error", success: false });
   }
 };
 
