@@ -1,6 +1,5 @@
-import fs from 'fs';
-import cloudinary from '../config/cloudinary.js';
 import logger from '../utils/logger.js';
+import { storeUploadedFile } from '../utils/storeUpload.js';
 import { sanitizeRichText, htmlToPlainText } from '../utils/sanitizeHtml.js';
 import { uniqueSlug, slugify } from '../utils/slugify.js';
 import { revalidateFrontend } from '../utils/revalidateFrontend.js';
@@ -51,26 +50,14 @@ export const parseObject = (value, fallback = {}) => {
   return fallback;
 };
 
-export const uploadImageFile = async (file, folder) => {
-  try {
-    const result = await cloudinary.uploader.upload(file.path, {
-      folder: `buildestate/${folder}`,
-      resource_type: 'image',
-    });
-    return { url: result.secure_url, width: result.width, height: result.height };
-  } finally {
-    fs.unlink(file.path, (err) => {
-      if (err) logger.warn('Failed to remove temp upload', { error: err.message });
-    });
-  }
-};
+export const uploadImageFile = (file, folder) => storeUploadedFile(file, folder);
 
 /**
  * @param {object} config
- * @param {import('mongoose').Model} config.Model
+ * @param {object} config.Model MySQL-backed model
  * @param {string} config.label            Human name, for logs and messages.
  * @param {string} config.targetType       Activity-log target type.
- * @param {string} config.folder           Cloudinary folder.
+ * @param {string} config.folder           Upload folder under public_html/uploads.
  * @param {string} config.listFields       Public projection.
  * @param {object} config.defaultSort
  * @param {(req) => object} [config.publicQuery]

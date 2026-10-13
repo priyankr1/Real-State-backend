@@ -8,7 +8,7 @@ import { getEmailTemplate, getListingApprovedTemplate, getListingRejectedTemplat
 import { logAdminActivity } from "../utils/activityLogger.js";
 import createCsvWriter from 'csv-writer';
 import fs from 'fs';
-import mongoose from 'mongoose';
+import mongoose from '../lib/mysqlMongoose.js';
 
 const formatRecentProperties = (properties) => {
   return properties.map((property) => ({

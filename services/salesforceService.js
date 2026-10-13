@@ -22,7 +22,7 @@ import { createEnquiry, validateCampaignCodeMap } from './salesforceEnquiryApi.j
  *
  * With none configured every call returns { skipped: true } and the enquiry
  * still saves. Lead capture must never depend on a third party being up — the
- * enquiry is in MongoDB before this module is ever called.
+ * enquiry is in MySQL before this module is ever called.
  */
 
 const API_VERSION = process.env.SALESFORCE_API_VERSION || 'v60.0';

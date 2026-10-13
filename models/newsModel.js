@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose from "../lib/mysqlMongoose.js";
 
 const newsSchema = new mongoose.Schema({
   email: {

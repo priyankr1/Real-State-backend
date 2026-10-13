@@ -7,7 +7,7 @@
  */
 
 import express from 'express';
-import mongoose from 'mongoose';
+import mongoose from '../lib/mysqlMongoose.js';
 import os from 'os';
 import emailService from '../services/emailService.js';
 
@@ -38,7 +38,7 @@ router.get('/ready', async (req, res) => {
 
   let httpStatus = 200;
 
-  // Check MongoDB connection
+  // Check MySQL connection
   try {
     const dbState = mongoose.connection.readyState;
     const stateMap = {

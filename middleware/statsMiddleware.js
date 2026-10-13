@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+import mongoose from '../lib/mysqlMongoose.js';
 import Stats from '../models/statsModel.js';
 
 export const trackAPIStats = async (req, res, next) => {

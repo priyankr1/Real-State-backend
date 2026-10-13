@@ -1,6 +1,5 @@
-import fs from "fs";
-import cloudinary from "../config/cloudinary.js";
 import Property from "../models/propertyModel.js";
+import { storeUploadedFile } from "../utils/storeUpload.js";
 
 const addproperty = async (req, res) => {
     try {
@@ -13,22 +12,8 @@ const addproperty = async (req, res) => {
 
         const images = [image1, image2, image3, image4].filter((item) => item !== undefined);
 
-        // Upload images to Cloudinary and delete local temp files
-        const imageUrls = await Promise.all(
-            images.map(async (item) => {
-                try {
-                    const result = await cloudinary.uploader.upload(item.path, {
-                        folder: "buildestate/properties",
-                        resource_type: "image",
-                    });
-                    return result.secure_url;
-                } finally {
-                    fs.unlink(item.path, (err) => {
-                        if (err) console.log("Error deleting the file: ", err);
-                    });
-                }
-            })
-        );
+        const stored = await Promise.all(images.map((item) => storeUploadedFile(item, "properties")));
+        const imageUrls = stored.map((item) => item.url);
 
         // Create a new product
         const product = new Property({
@@ -152,22 +137,8 @@ const updateproperty = async (req, res) => {
 
         const images = [image1, image2, image3, image4].filter((item) => item !== undefined);
 
-        // Upload images to Cloudinary and delete local temp files
-        const imageUrls = await Promise.all(
-            images.map(async (item) => {
-                try {
-                    const result = await cloudinary.uploader.upload(item.path, {
-                        folder: "buildestate/properties",
-                        resource_type: "image",
-                    });
-                    return result.secure_url;
-                } finally {
-                    fs.unlink(item.path, (err) => {
-                        if (err) console.log("Error deleting the file: ", err);
-                    });
-                }
-            })
-        );
+        const stored = await Promise.all(images.map((item) => storeUploadedFile(item, "properties")));
+        const imageUrls = stored.map((item) => item.url);
 
         property.title = title;
         property.location = location;

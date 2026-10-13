@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+import mongoose from '../lib/mysqlMongoose.js';
 
 /**
  * A website enquiry, with the campaign attribution that produced it.

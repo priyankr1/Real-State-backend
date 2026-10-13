@@ -10,7 +10,7 @@ const MAX_ATTEMPTS = 6;
  * Retries enquiries that failed to reach Salesforce.
  *
  * Salesforce goes down, tokens get revoked, validation rules get added on a
- * Friday afternoon. Without this, those leads would sit in MongoDB with
+ * Friday afternoon. Without this, those leads would sit in MySQL with
  * nobody in sales ever seeing them — the enquiry looks captured and is
  * effectively lost. Runs every 10 minutes and gives up after MAX_ATTEMPTS so
  * a permanently malformed lead cannot spin forever; the admin panel still

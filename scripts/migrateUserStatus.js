@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-import mongoose from 'mongoose';
+import mongoose from '../lib/mysqlMongoose.js';
 import User from '../models/userModel.js';
 
 // Load environment variables
@@ -14,9 +14,8 @@ dotenv.config();
  */
 async function migrateUserStatus() { 
   try {
-    // Connect to MongoDB
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log('📦 Connected to MongoDB');
+    await mongoose.connect();
+    console.log('Connected to MySQL');
 
     // Update all users that don't have status field
     const result = await User.updateMany(
@@ -33,7 +32,7 @@ async function migrateUserStatus() {
 
     // Disconnect
     await mongoose.disconnect();
-    console.log('📦 Disconnected from MongoDB');
+    console.log('Disconnected from MySQL');
 
     process.exit(0);
   } catch (error) {

@@ -5,8 +5,8 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
-import mongoSanitize from 'express-mongo-sanitize';
-import connectdb from './config/mongodb.js';
+import connectdb, { closeDatabase } from './config/mysql.js';
+import { uploadRoot } from './utils/storeUpload.js';
 import { trackAPIStats } from './middleware/statsMiddleware.js';
 import { requestIdMiddleware } from './middleware/requestIdMiddleware.js';
 import logger from './utils/logger.js';
@@ -90,19 +90,6 @@ app.use(requestIdMiddleware);
 
 app.use(trackAPIStats);
 
-// NoSQL injection prevention
-app.use(mongoSanitize({
-  replaceWith: '_',
-  onSanitize: ({ req, key }) => {
-    logger.warn('Sanitized NoSQL injection attempt', {
-      key,
-      url: req.originalUrl,
-      requestId: req.requestId,
-    });
-  }
-}));
-
-
 // CORS Configuration
 const parseCsv = (value = '') =>
   value
@@ -154,6 +141,11 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  next();
+}, express.static(uploadRoot()));
+
 // Salesforce configuration is checked once at boot rather than per enquiry:
 // a missing default campaign code rejects every lead the endpoint receives,
 // and that is worth finding in the deploy log instead of in a week of failed
@@ -172,11 +164,7 @@ connectdb().then(() => {
     port: process.env.PORT || 4000,
     env: process.env.NODE_ENV || 'development',
     db: true,
-    cloudinary: !!(
-      process.env.CLOUDINARY_CLOUD_NAME &&
-      process.env.CLOUDINARY_API_KEY &&
-      process.env.CLOUDINARY_API_SECRET
-    ),
+    uploads: uploadRoot(),
   });
 }).catch(err => {
   logger.error('Database connection error', { error: err.message, stack: err.stack });
@@ -268,6 +256,7 @@ process.on('SIGTERM', async () => {
       logger.info('HTTP server closed.');
     });
   }
+  await closeDatabase().catch((error) => logger.error('Error closing MySQL pool', { error: error.message }));
   // Give processes time to finish
   setTimeout(() => {
     process.exit(0);
@@ -277,11 +266,13 @@ process.on('SIGTERM', async () => {
 process.on('SIGINT', async () => {
   logger.info('SIGINT received. Shutting down gracefully...');
   if (server) {
-    server.close(() => {
+    server.close(async () => {
+      await closeDatabase().catch((error) => logger.error('Error closing MySQL pool', { error: error.message }));
       logger.info('HTTP server closed.');
       process.exit(0);
     });
   } else {
+    await closeDatabase().catch((error) => logger.error('Error closing MySQL pool', { error: error.message }));
     process.exit(0);
   }
 });

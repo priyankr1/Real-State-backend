@@ -22,6 +22,13 @@ jspm_packages/
 # Optional REPL history
 .node_repl_history
 
+# Uploaded images. On the server these live in public_html/uploads.
+uploads/
+cpanel-upload-pack/
+
+# Generated database dump for the cPanel import. Contains live records.
+scripts/cpanel-data-import.sql
+
 # dotenv environment variables file
 .env
 .env.local

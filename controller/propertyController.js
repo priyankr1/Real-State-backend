@@ -1,31 +1,12 @@
-import fs from 'fs';
-import cloudinary from '../config/cloudinary.js';
 import Property from '../models/propertyModel.js';
 import logger from '../utils/logger.js';
+import { storeUploadedFile } from '../utils/storeUpload.js';
 
 const EXPIRY_DAYS = 45;
 
-/**
- * Upload files in req.files (from multer array) to Cloudinary.
- * Returns an array of public URLs.
- * Deletes each temp file after uploading.
- */
 async function uploadImages(files) {
-    return Promise.all(
-        files.map(async (file) => {
-            try {
-                const result = await cloudinary.uploader.upload(file.path, {
-                    folder: 'buildestate/properties',
-                    resource_type: 'image',
-                });
-                return result.secure_url;
-            } finally {
-                fs.unlink(file.path, (err) => {
-                    if (err) logger.warn("Error deleting temp file", { error: err?.message });
-                });
-            }
-        })
-    );
+    const stored = await Promise.all(files.map((file) => storeUploadedFile(file, 'properties')));
+    return stored.map((file) => file.url);
 }
 
 /** POST /api/user/properties â€” create a new listing (pending approval) */

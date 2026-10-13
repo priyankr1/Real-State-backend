@@ -71,7 +71,7 @@ const cleanDate = (value) => {
  * POST /api/enquiries
  *
  * Order of operations matters: the enquiry is persisted BEFORE the email and
- * before Salesforce. A lead that reached MongoDB is never lost, whatever
+ * before Salesforce. A lead that reached MySQL is never lost, whatever
  * happens downstream — both notification and CRM sync are retryable, a
  * dropped HTTP request is not.
  */

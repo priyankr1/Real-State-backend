@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+import mongoose from '../lib/mysqlMongoose.js';
 
 const statsSchema = new mongoose.Schema({
   endpoint: {

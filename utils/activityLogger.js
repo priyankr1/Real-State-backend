@@ -7,7 +7,7 @@ import AdminActivityLog from '../models/adminActivityLogModel.js';
  * @param {string} adminEmail - Email of the admin performing the action
  * @param {string} action - Action type (from AdminActivityLog enum)
  * @param {string} targetType - Type of target (property, user, appointment)
- * @param {ObjectId} targetId - MongoDB ID of the affected document
+ * @param {string} targetId - Preserved 24-character ID of the affected document
  * @param {string} targetName - Name/title of the target for quick reference
  * @param {Object} metadata - Additional action-specific data
  * @param {Object} req - Express request object for IP and user agent

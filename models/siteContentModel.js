@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+import mongoose from '../lib/mysqlMongoose.js';
 
 /**
  * The page content that is not a list of things.

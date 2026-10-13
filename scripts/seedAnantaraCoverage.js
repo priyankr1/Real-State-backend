@@ -14,7 +14,7 @@
  */
 
 import dotenv from 'dotenv';
-import mongoose from 'mongoose';
+import mongoose from '../lib/mysqlMongoose.js';
 
 import MediaItem from '../models/mediaItemModel.js';
 import { sanitizeRichText } from '../utils/sanitizeHtml.js';
@@ -287,11 +287,11 @@ const items = [
 ];
 
 async function main() {
-  if (!process.env.MONGO_URI) {
-    throw new Error('MONGO_URI is not set. Add it to backend/.env.local.');
+  if (!process.env.DB_HOST || !process.env.DB_NAME || !process.env.DB_USER || !process.env.DB_PASSWORD) {
+    throw new Error('MySQL DB_* settings are incomplete. Add them to backend/.env.local.');
   }
 
-  await mongoose.connect(process.env.MONGO_URI);
+  await mongoose.connect();
   console.log('Connected.\n');
 
   for (const item of items) {

@@ -6,7 +6,7 @@ _The core REST API server driving the BuildEstate real estate platform._
 
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![Express.js](https://img.shields.io/badge/Express.js-Backend-000000?style=for-the-badge&logo=express&logoColor=white)](https://expressjs.com)
-[![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?style=for-the-badge&logo=mongodb&logoColor=white)](https://www.mongodb.com)
+[![MySQL](https://img.shields.io/badge/MySQL-8%2B-4479A1?style=for-the-badge&logo=mysql&logoColor=white)](https://www.mysql.com/)
 
 [![Live API](https://img.shields.io/badge/Live_API-On_Render-46E3B7?style=for-the-badge&logo=render&logoColor=white)](https://real-estate-website-backend-zfu7.onrender.com/)
 
@@ -32,8 +32,8 @@ _The core REST API server driving the BuildEstate real estate platform._
 | ------------------------ | ------------------------ | --------------------------------------------------- |
 | **Runtime**              | Node.js 18+              | High-throughput asynchronous JS compilation         |
 | **Application Layer**    | Express.js               | Granular endpoint definitions                       |
-| **Database Systems**     | MongoDB Atlas            | Distributed NoSQL storage                           |
-| **Object Modeling**      | Mongoose                 | Typed modeling and validation protocols             |
+| **Database Systems**     | MySQL / MariaDB          | cPanel-compatible persistent storage                |
+| **Data Modeling**        | MySQL compatibility layer | Preserves API shapes and legacy 24-character IDs   |
 | **Authentication**       | JWT + Bcrypt             | Cryptographically verified tokens and keys          |
 | **Storage Architecture** | Multer + Cloudinary      | Multipart transmission yielding CDN delivery        |
 | **Communications**       | Nodemailer + SMTP        | Specialized template execution and delivery routing |
@@ -66,8 +66,13 @@ cp .env.example .env.local
 PORT=4000
 NODE_ENV=development
 
-# MongoDB Atlas connection string
-MONGO_URI=mongodb+srv://<user>:<pass>@<cluster>.mongodb.net/?retryWrites=true&w=majority
+# MySQL / cPanel database
+DB_HOST=your_mysql_host
+DB_PORT=3306
+DB_NAME=your_cpanel_database
+DB_USER=your_cpanel_database_user
+DB_PASSWORD=your_database_password
+DB_SSL=false
 
 # JWT (generate with: openssl rand -hex 32)
 JWT_SECRET=your_jwt_secret_here
@@ -107,6 +112,18 @@ npm run dev
 Server initializes and binds to `http://localhost:4000`
 
 </details>
+
+### Migrating existing MongoDB data
+
+Keep `MONGO_URI` temporarily in `.env.local`, configure all `DB_*` values, stop writes to the old application, then run:
+
+```bash
+npm run migrate:mongo-to-mysql
+```
+
+The command copies every non-system collection, preserves MongoDB IDs and references, upserts safely when re-run, and verifies source/copy/destination counts. Remove `MONGO_URI` after the cutover succeeds.
+
+If the cPanel database user cannot create tables, import `scripts/mysql-schema.sql` once through phpMyAdmin before running the migration.
 
 ---
 
@@ -186,7 +203,7 @@ Server initializes and binds to `http://localhost:4000`
 
 ```text
 backend/
-â”œâ”€â”€ config/                # Service Initializations (MongoDB, CDN, SMTP)
+â”œâ”€â”€ config/                # Service Initializations (MySQL, CDN, SMTP)
 â”œâ”€â”€ controller/            # API Route Controllers (The execution core)
 â”œâ”€â”€ middleware/            # Injection Rules (Auth locks, Upload configs, Rate-limiters)
 â”œâ”€â”€ models/                # Schema Rulesets (Mongoose structural definitions)
@@ -210,7 +227,7 @@ To guarantee high scalability, image uploads follow a strict proxy lifecycle:
 1. Operations manager (Admin) inputs high-res images to the frontend.
 2. The endpoint passes elements heavily shielded by **Multer** into deep-cache `uploads/`.
 3. The server uploads payloads securely to **Cloudinary** using dedicated SDK credentials.
-4. CDN access URIs are returned and definitively saved within MongoDB Atlas structure nodes.
+4. CDN access URIs are returned and saved in the MySQL-backed property record.
 5. Temp `uploads/` files are wiped utilizing strict cleanup events.
 
 ---

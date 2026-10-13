@@ -28,7 +28,7 @@
  */
 
 import dotenv from 'dotenv';
-import mongoose from 'mongoose';
+import mongoose from '../lib/mysqlMongoose.js';
 
 import Property from '../models/propertyModel.js';
 
@@ -572,12 +572,12 @@ const buildDescription = (seed) => {
 };
 
 async function main() {
-  if (!process.env.MONGO_URI) {
-    throw new Error('MONGO_URI is not set. Add it to backend/.env.local.');
+  if (!process.env.DB_HOST || !process.env.DB_NAME || !process.env.DB_USER || !process.env.DB_PASSWORD) {
+    throw new Error('MySQL DB_* settings are incomplete. Add them to backend/.env.local.');
   }
 
-  await mongoose.connect(process.env.MONGO_URI);
-  console.log('Connected to MongoDB\n');
+  await mongoose.connect();
+  console.log('Connected to MySQL\n');
 
   let created = 0;
   let updated = 0;

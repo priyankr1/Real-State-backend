@@ -1,6 +1,5 @@
-import fs from "fs";
-import cloudinary from "../config/cloudinary.js";
 import Blog from "../models/blogModel.js";
+import { storeUploadedFile } from "../utils/storeUpload.js";
 import logger from "../utils/logger.js";
 import { sanitizeRichText, htmlToPlainText } from "../utils/sanitizeHtml.js";
 import { uniqueSlug, slugify } from "../utils/slugify.js";
@@ -44,19 +43,7 @@ const parseList = (value) => {
   return raw.split(",").map((v) => v.trim()).filter(Boolean);
 };
 
-const uploadImageFile = async (file) => {
-  try {
-    const result = await cloudinary.uploader.upload(file.path, {
-      folder: "buildestate/blog",
-      resource_type: "image",
-    });
-    return result.secure_url;
-  } finally {
-    fs.unlink(file.path, (err) => {
-      if (err) logger.warn("Failed to remove temp upload", { error: err.message });
-    });
-  }
-};
+const uploadImageFile = async (file) => (await storeUploadedFile(file, "blog")).url;
 
 // Paths whose ISR cache a post mutation invalidates.
 const pathsFor = (post) => [
@@ -478,7 +465,7 @@ export const adminDeleteBlog = async (req, res) => {
 
 /**
  * POST /api/blogs/admin/upload-image
- * Inline image upload for the rich-text editor. Returns a Cloudinary URL the
+ * Inline image upload for the rich-text editor. Returns the public file URL the
  * editor drops straight into the body.
  */
 export const adminUploadImage = async (req, res) => {

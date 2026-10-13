@@ -12,7 +12,7 @@ function pad(str, total) {
   return str + ' '.repeat(Math.max(0, total - visible));
 }
 
-export function printBanner({ port, env, db, cloudinary }) {
+export function printBanner({ port, env, db, uploads }) {
   if (process.env.NODE_ENV === 'production') return;
 
   const title = `${B}${C}BuildEstate API${R}  ${D}v1.0.0${R}`;
@@ -40,7 +40,7 @@ export function printBanner({ port, env, db, cloudinary }) {
     line('Environment', `${C}${env}${R}`),
     line('Port', `${C}0.0.0.0:${port}${R}`),
     line('Database', `${db ? `${G}connected${R}` : `\x1b[31mnot connected${R}`}`, db),
-    line('Cloudinary', `${cloudinary ? `${G}connected${R}` : `\x1b[31mmissing keys${R}`}`, cloudinary),
+    line('Uploads', uploads || 'uploads'),
     line('Started', `${D}${t}${R}`),
     '',
     `  ${D}Crons  expire-listings 00:05 · auto-unsuspend 00:10${R}`,

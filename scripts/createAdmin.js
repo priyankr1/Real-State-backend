@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
-import mongoose from 'mongoose';
+import mongoose from '../lib/mysqlMongoose.js';
 import { Admin } from '../models/userModel.js';
 
 // Load environment variables
@@ -9,9 +9,8 @@ dotenv.config({ path: './.env' });
 
 const createAdminUser = async () => {
   try {
-    // Connect to MongoDB
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log('Connected to MongoDB');
+    await mongoose.connect();
+    console.log('Connected to MySQL');
 
     // Check if admin user already exists
     const existingAdmin = await Admin.findOne({ email: process.env.ADMIN_EMAIL });
@@ -39,8 +38,8 @@ const createAdminUser = async () => {
   } catch (error) {
     console.error('Error creating admin user:', error.message);
   } finally {
-    mongoose.connection.close();
-    console.log('MongoDB connection closed');
+    await mongoose.connection.close();
+    console.log('MySQL connection closed');
   }
 };
 
