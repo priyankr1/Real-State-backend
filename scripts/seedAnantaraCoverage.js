@@ -70,6 +70,8 @@ const items = [
     publication: 'Press Trust of India',
     externalUrl:
       'https://www.ptinews.com/story/business/minor-hotels-to-operate-anantara-property-at-rs-2-400-cr-world-trade-centre-in-kolkata/3536054',
+    coverImage: CEREMONY,
+    coverImageAlt: 'Signing ceremony for the Anantara hotel at World Trade Center Kolkata',
     order: 2,
     content: `
       <p>The Press Trust of India reported on 6 April 2026 that Minor Hotels will operate an Anantara hotel at the World Trade Centre in Salt Lake, Kolkata. The development is by Merlin Group and Aryan Realty.</p>
@@ -143,6 +145,8 @@ const items = [
     publication: 'Hospitality Biz India',
     externalUrl:
       'https://hospitalitybizindia.com/news-track/minor-hotels-signs-anantara-luxury-hotel-at-kolkatas-world-trade-centre/',
+    coverImage: CEREMONY,
+    coverImageAlt: 'Signing ceremony for the Anantara hotel at World Trade Center Kolkata',
     order: 5,
     content: `
       <p>Hospitality Biz India reported the signing on 6 April 2026. Minor Hotels will operate the hotel under a management contract, without equity. The hotel is estimated at ₹200 crore inside the ₹2,400 crore World Trade Center development by Aryan Realty and Merlin Group.</p>
@@ -164,6 +168,8 @@ const items = [
     date: '2026-04-06',
     publication: 'Rediff Money',
     externalUrl: 'https://money.rediff.com/news/market/anantara-hotel-to-open-at-kolkata-wtc/44836920260406',
+    coverImage: TRAVTALK,
+    coverImageAlt: 'Sushil Mohta, William Heinecke and Sanjay Saraf at the Anantara Kolkata announcement',
     order: 6,
     content: `
       <p>Rediff Money published the Press Trust of India account on 6 April 2026. A Minor Hotels spokesperson told PTI the Kolkata hotel is a management contract: the operator does not have equity, and the hotel cost estimate is ₹200 crore.</p>
@@ -186,6 +192,8 @@ const items = [
     publication: 'Devdiscourse',
     externalUrl:
       'https://www.devdiscourse.com/article/entertainment/3863971-anantara-kolkata-redefining-luxury-at-world-trade-centre',
+    coverImage: '/merlin/wtc/tower-01-evening.jpg',
+    coverImageAlt: 'World Trade Center Kolkata tower in the evening',
     order: 7,
     content: `
       <p>Devdiscourse reported on 6 April 2026 that Minor Hotels had signed to operate an Anantara hotel at World Trade Center, Salt Lake. The report describes a ₹2,400 crore joint venture with Aryan Realty and Merlin Group, completion by 2032, and about 170 rooms. It identifies the hotel as Minor Hotels’ first urban Anantara in India.</p>
@@ -207,6 +215,8 @@ const items = [
     date: '2026-04-07',
     publication: 'BengalInfo',
     externalUrl: 'https://bengalinfo.com/newsdetail.php?newsid=473228',
+    coverImage: '/merlin/wtc/towers-night.jpg',
+    coverImageAlt: 'World Trade Center Kolkata towers at night',
     order: 8,
     content: `
       <p>BengalInfo republished The Times of India report of 7 April 2026. It records William Heinecke’s comment that Minor Hotels will look for a second hotel in Bengal, to be announced by the end of the year, and the 170-key Anantara at World Trade Center Sector V developed by Merlin Group and Aryan Realty.</p>
@@ -316,6 +326,24 @@ async function main() {
     doc.createdBy = doc.createdBy || 'admin';
     await doc.save();
     console.log(`${existing ? 'updated' : 'created'}  ${item.kind.padEnd(6)}  ${item.slug}`);
+  }
+
+  const covers = [
+    CEREMONY,
+    TRAVTALK,
+    '/merlin/wtc/tower-01-evening.jpg',
+    '/merlin/wtc/towers-night.jpg',
+    '/merlin/wtc/courtyard-plaza.jpg',
+  ];
+  const rest = await MediaItem.find({});
+  let index = 0;
+  for (const doc of rest) {
+    if (doc.coverImage) continue;
+    doc.coverImage = covers[index % covers.length];
+    doc.coverImageAlt = doc.coverImageAlt || doc.title;
+    index += 1;
+    await doc.save();
+    console.log(`image     ${(doc.kind || '').padEnd(6)}  ${doc.slug}`);
   }
 
   await mongoose.disconnect();
