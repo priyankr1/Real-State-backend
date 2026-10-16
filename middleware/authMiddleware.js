@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken";
-import userModel from "../models/userModel.js";
+import userModel, { Admin } from "../models/userModel.js";
 
 export const protect = async (req, res, next) => {
   try {
@@ -45,16 +45,17 @@ export const adminProtect = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const email = String(decoded.email || "").trim().toLowerCase();
+    const admin = email ? await Admin.findOne({ email }) : null;
 
-    // Verify this is an admin token (has email field matching admin email)
-    if (!decoded.email || decoded.email !== process.env.ADMIN_EMAIL) {
+    if (!admin) {
       return res.status(403).json({
         success: false,
-        message: "Admin access denied - invalid admin token",
+        message: "Admin session was refused",
       });
     }
 
-    req.admin = { email: decoded.email };
+    req.admin = { email: admin.email, id: admin._id };
     next();
   } catch (error) {
     console.error("Admin auth error:", error);

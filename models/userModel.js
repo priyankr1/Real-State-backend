@@ -48,10 +48,12 @@ const User = mongoose.model('User', UserSchema);
 
 // Admin model with password hashing
 const AdminSchema = new mongoose.Schema({
-    email: { type: String, required: true, unique: true },
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true },
     role: { type: String, default: 'admin' },
     lastLogin: { type: Date },
+    resetToken: { type: String },
+    resetTokenExpire: { type: Date },
 
     // Brute-force protection
     failedLoginAttempts: { type: Number, default: 0 },

@@ -579,6 +579,10 @@ const normalizePages = (body) => {
   return {
     contact: {
       ...masthead(contact),
+      weekdayLabel: text(contact.weekdayLabel, 80),
+      weekdayHours: text(contact.weekdayHours, 80),
+      sundayLabel: text(contact.sundayLabel, 80),
+      sundayHours: text(contact.sundayHours, 80),
       faqHeading: text(contact.faqHeading, 160),
       faqIntro: longText(contact.faqIntro, 400),
       faq: list(contact.faq, (item) => {

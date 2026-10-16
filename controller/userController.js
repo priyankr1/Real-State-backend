@@ -311,12 +311,17 @@ const issueAdminSession = async (res, admin) => {
     maxAge: REFRESH_TTL_MS,
   });
 
-  return jwt.sign({ email: admin.email }, process.env.JWT_SECRET, { expiresIn: '2h' });
+  return jwt.sign(
+    { adminId: admin._id, email: admin.email, role: 'admin' },
+    process.env.JWT_SECRET,
+    { expiresIn: '2h' }
+  );
 };
 
 const adminlogin = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const { password } = req.body;
 
     const admin = await Admin.findOne({ email });
     if (!admin) {
@@ -371,14 +376,79 @@ const adminRefresh = async (req, res) => {
   }
 };
 
+const adminForgotPassword = async (req, res) => {
+  try {
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const admin = email ? await Admin.findOne({ email }) : null;
+    if (admin) {
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      admin.resetToken = sha256(resetToken);
+      admin.resetTokenExpire = new Date(Date.now() + 30 * 60 * 1000);
+      await admin.save();
+
+      const adminUrl = (process.env.ADMIN_URL || 'https://admin.wtcsaltlake.com').replace(/\/$/, '');
+      const resetUrl = `${adminUrl}/reset-password/${resetToken}`;
+      try {
+        await emailService.sendEmail(
+          admin.email,
+          'Reset your WTC Salt Lake admin password',
+          `<p>A password reset was requested for the WTC Salt Lake admin panel.</p>
+           <p><a href="${resetUrl}">Choose a new password</a></p>
+           <p>This link expires in 30 minutes. If you did not ask for this, you can ignore this email.</p>`
+        );
+      } catch (emailError) {
+        console.error('Failed to send admin password reset email:', emailError);
+      }
+    }
+
+    return res.status(200).json({
+      message: 'If an admin account with that email exists, a reset link has been sent.',
+      success: true,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Server error', success: false });
+  }
+};
+
+const adminResetPassword = async (req, res) => {
+  try {
+    const password = String(req.body.password || '');
+    if (password.length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters.', success: false });
+    }
+
+    const admin = await Admin.findOne({ resetToken: sha256(String(req.params.token || '')) });
+    if (!admin || !admin.resetTokenExpire || new Date(admin.resetTokenExpire).getTime() < Date.now()) {
+      return res.status(400).json({ message: 'Invalid or expired reset link', success: false });
+    }
+
+    admin.password = password;
+    admin.resetToken = undefined;
+    admin.resetTokenExpire = undefined;
+    admin.refreshTokenHash = undefined;
+    admin.refreshTokenExpiry = undefined;
+    admin.failedLoginAttempts = 0;
+    admin.lockUntil = undefined;
+    await admin.save();
+
+    return res.status(200).json({ message: 'Password updated. You can sign in now.', success: true });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Server error', success: false });
+  }
+};
+
 const adminLogout = async (req, res) => {
   try {
     const raw = req.cookies?.[ADMIN_REFRESH_COOKIE];
     if (raw) {
-      await Admin.updateOne(
-        { refreshTokenHash: sha256(raw) },
-        { $unset: { refreshTokenHash: '', refreshTokenExpiry: '' } }
-      );
+      const admin = await Admin.findOne({ refreshTokenHash: sha256(raw) });
+      if (admin) {
+        admin.refreshTokenHash = undefined;
+        admin.refreshTokenExpiry = undefined;
+        await admin.save();
+      }
     }
     res.clearCookie(ADMIN_REFRESH_COOKIE, refreshCookieOptions());
     return res.json({ message: "Logged out", success: true });
@@ -568,4 +638,4 @@ const resendVerification = async (req, res) => {
   }
 };
 
-export { login, register, forgotpassword, resetpassword, adminlogin, adminRefresh, adminLogout, logout, userRefresh, getname, verifyEmail, updateProfile, resendVerification };
+export { login, register, forgotpassword, resetpassword, adminlogin, adminForgotPassword, adminResetPassword, adminRefresh, adminLogout, logout, userRefresh, getname, verifyEmail, updateProfile, resendVerification };
